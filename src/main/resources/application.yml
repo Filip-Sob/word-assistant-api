@@ -1,8 +1,9 @@
 spring:
   datasource:
     url: jdbc:postgresql://localhost:5432/word_assistant
-    username: word_assistant
-    password: word123
+    username: ${DB_USER:word_assistant}
+    password: ${DB_PASS:word123}
+
 
   jpa:
     hibernate:
