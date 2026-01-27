@@ -28,13 +28,19 @@ public class OpenAiService {
         String instr = (instruction == null) ? "" : instruction.trim();
         AssistMode m = (mode == null) ? AssistMode.REWRITE : mode;
 
+        // Minimalne walidacje MVP
         if (instr.isBlank()) {
             throw new IllegalArgumentException("instruction is required");
         }
 
+        // EXPLAIN wymaga tekstu do interpretacji
         if (m == AssistMode.EXPLAIN && context.isBlank()) {
             throw new IllegalArgumentException("contextText is required for EXPLAIN mode");
         }
+
+        // DOCUMENT celowo NIE wymaga contextu:
+        // - pusty dokument => generowanie od zera
+        // - niepusty => praca na całości
 
         String system = switch (m) {
             case REWRITE -> """
@@ -47,6 +53,13 @@ public class OpenAiService {
                     You are a helpful writing assistant for Microsoft Word.
                     Explain/interpret the provided TEXT according to the INSTRUCTION.
                     Return ONLY the explanation (not the original text), in a clear and structured way.
+                    """;
+            case DOCUMENT -> """
+                    You are a helpful writing assistant for Microsoft Word.
+                    You will receive the FULL DOCUMENT as TEXT (it may be empty).
+                    Apply the INSTRUCTION to the whole document and return ONLY the revised full document text.
+                    If the document is empty, generate new content that follows the INSTRUCTION.
+                    Do not add commentary unless explicitly requested.
                     """;
         };
 
@@ -77,13 +90,20 @@ public class OpenAiService {
             throw new IllegalStateException("Empty response from OpenAI");
         }
 
+        // Fallback parser:
+        // 1) preferuje content.type == "output_text"
+        // 2) jeśli brak, bierze pierwszy niepusty content.text niezależnie od typu
+        // 3) jeśli nadal brak tekstu => zwraca pusty string (pozwala na "delete" use-case)
         return response.output().stream()
                 .flatMap(out -> out.content() == null ? Stream.empty() : out.content().stream())
-                .filter(c -> "output_text".equals(c.type()))
-                .map(OpenAiResponsesResponse.ContentItem::text)
+                .filter(c -> c.text() != null && !c.text().isBlank())
+                .sorted((a, b) -> {
+                    boolean aPref = "output_text".equals(a.type());
+                    boolean bPref = "output_text".equals(b.type());
+                    return Boolean.compare(bPref, aPref); // output_text first
+                })
+                .map(c -> c.text().trim())
                 .findFirst()
-                .map(String::trim)
-                .filter(s -> !s.isBlank())
-                .orElseThrow(() -> new IllegalStateException("No output_text in OpenAI response"));
+                .orElse("");
     }
 }
