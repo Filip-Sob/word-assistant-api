@@ -10,4 +10,6 @@ import java.util.UUID;
 public interface AiActionLogRepository extends JpaRepository<AiActionLog, UUID> {
     List<AiActionLog> findByClientIdOrderByCreatedAtDesc(String clientId, Pageable pageable);
     Optional<AiActionLog> findByIdAndClientId(UUID id, String clientId);
+    long deleteByClientId(String clientId);
+
 }

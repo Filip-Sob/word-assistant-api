@@ -1,6 +1,7 @@
 package pl.sobczak.wordassistant.controller;
 
 import org.springframework.data.domain.PageRequest;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 import pl.sobczak.wordassistant.history.AiActionLog;
 import pl.sobczak.wordassistant.history.AiActionLogRepository;
@@ -31,4 +32,18 @@ public class HistoryController {
         return repo.findByIdAndClientId(id, clientId)
                 .orElseThrow(() -> new IllegalArgumentException("log not found"));
     }
+
+    @DeleteMapping("/history")
+    @Transactional
+    public DeleteHistoryResponse clearHistory(@RequestParam String clientId) {
+        String safeClientId = clientId == null ? "" : clientId.trim();
+        if (safeClientId.isBlank()) {
+            throw new IllegalArgumentException("clientId is required");
+        }
+
+        long deleted = repo.deleteByClientId(safeClientId);
+        return new DeleteHistoryResponse(deleted);
+    }
+
+    public record DeleteHistoryResponse(long deletedCount) {}
 }
